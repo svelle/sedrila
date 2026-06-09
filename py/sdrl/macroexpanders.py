@@ -28,6 +28,8 @@ def register_macros(course: sdrl.coursebuilder.Coursebuilder):
                           functools.partial(expand_partref, course))  # name as linktext
     macros.register_macro('PARTREF2', 2, MM.INNER, 
                           functools.partial(expand_partref, course))  # explicit linktext
+    macros.register_macro('PARTREFMANUAL', 2, MM.INNER,
+                          functools.partial(expand_partref, course))  # legacy explicit linktext
     macros.register_macro('TREEREF', 1, MM.INNER, 
                           functools.partial(expand_treeref, course))  # show full path in itree
     macros.register_macro('EC', 0, MM.INNER, expand_enumeration, partswitch_enumeration)
@@ -67,17 +69,26 @@ def expand_href(course: sdrl.coursebuilder.Coursebuilder, macrocall: macros.Macr
 def expand_partref(course: sdrl.coursebuilder.Coursebuilder, macrocall: macros.Macrocall) -> str:
     part = course.get_part(macrocall.filename, macrocall.arg1)
     linktext = dict(PARTREF=part.name, 
-                    PARTREF2=macrocall.arg2)[macrocall.macroname]
+                    PARTREF2=macrocall.arg2,
+                    PARTREFMANUAL=macrocall.arg2)[macrocall.macroname]
     return f"<a href='{part.outputfile}' class='partref-link'>{html.escape(linktext)}</a>"
 
 
 def expand_treeref(course: sdrl.coursebuilder.Coursebuilder, macrocall: macros.Macrocall) -> str:
+    if not course.itreedir:
+        b.warning(f"{macrocall.macrocall_text}: no itreedir configured; showing placeholder",
+                  file=macrocall.filename)
+        return _treeref_markup("???")
     actualpath = includefile_path(course, macrocall, itree_mode=True)
     showpath = actualpath[len(course.itreedir)+1:]  # skip itreedir part of path
     if not os.path.exists(actualpath):
         b.warning(f"{macrocall.macrocall_text}: itreedir file '{actualpath}' not found",
                   file=macrocall.filename)
         showpath = "???"
+    return _treeref_markup(showpath)
+
+
+def _treeref_markup(showpath: str) -> str:
     prefix = "<span class='treeref-prefix'></span>"
     mainpart = f"<span class='treeref'>{html.escape(showpath, quote=False)}</span>"
     suffix = "<span class='treeref-suffix'></span>"

@@ -158,6 +158,46 @@ def test_prepare_itree_zip_valid_zip_calls_make_the_twice():
     assert course.directory.make_the.call_count == 2
 
 
+# ── local_build_configfile ────────────────────────────────────────────────────
+
+def test_local_build_configfile_adds_dates_and_removes_private_artifacts(tmp_path):
+    configfile = tmp_path / "sedrila.yaml"
+    configfile.write_text("""
+title: Test Course
+name: Test
+chapterdir: ch
+altdir: altdir/ch
+stages: [draft]
+instructors:
+  - nameish: Teacher
+    email: teacher@example.org
+    gitaccount: teacher
+    webaccount: teacher
+    keyfingerprint: "-"
+    pubkey: "-"
+allowed_attempts: "2"
+itreedir: altdir/itree.zip
+htaccess_template: "Require user teacher"
+participants:
+  file: participants.tsv
+  file_column: username
+  student_attribute: student_gituser
+chapters:
+  - name: Chapter
+    taskgroups:
+      - name: Group
+""")
+    with author.local_build_configfile(str(configfile), "2024-01-01", "2024-12-31") as local_config:
+        config = b.slurp_yaml(local_config)
+        assert config["startdate"] == "2024-01-01"
+        assert config["enddate"] == "2024-12-31"
+        assert "itreedir" not in config
+        assert "htaccess_template" not in config
+        assert "participants" not in config
+        assert os.path.exists(local_config)
+    assert not os.path.exists(local_config)
+
+
 # ── purge_all_but ─────────────────────────────────────────────────────────────
 
 def test_purge_all_but_deletes_unlisted_file(tmp_path):

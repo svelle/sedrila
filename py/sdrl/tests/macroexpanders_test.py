@@ -1,5 +1,6 @@
 # pytest tests
 import unittest.mock
+import types
 
 import base as b
 import sdrl.macros as macros
@@ -26,6 +27,14 @@ class CourseDummy:
     altdir = "altdir/ch"
     itreedir = "altdir/itree.zip"
     chapterdir = "ch"
+
+    @staticmethod
+    def get_part(filename, partname):
+        return types.SimpleNamespace(name=partname, outputfile=f"{partname}.html")
+
+
+class CourseWithoutItreeDummy(CourseDummy):
+    itreedir = None
 
 
 def test_expand_prot():
@@ -58,3 +67,23 @@ def test_includefile_path():
     assert func("ITREE:") == "altdir/itree.zip/chapter/group/task.md"
     assert func("other", itree_mode=True) == "altdir/itree.zip/chapter/group/other"
     assert func("/other2", itree_mode=True) == "altdir/itree.zip/other2"
+
+
+def test_partrefmanual_uses_explicit_link_text():
+    call = macros.Macrocall(None, "notask.md", "notask",
+                            "[PARTREFMANUAL::Target::manual text]",
+                            "PARTREFMANUAL", "Target", "manual text")
+    assert sdrl.macroexpanders.expand_partref(CourseDummy(), call) == (
+        "<a href='Target.html' class='partref-link'>manual text</a>"
+    )
+
+
+def test_expand_treeref_without_itreedir_returns_placeholder():
+    b._testmode_reset()
+    call = macros.Macrocall(None, "ch/chapter/group/task.md", "task",
+                            "[TREEREF::solution.py]", "TREEREF", "solution.py", None)
+    assert sdrl.macroexpanders.expand_treeref(CourseWithoutItreeDummy(), call) == (
+        "<span class='treeref-prefix'></span>"
+        "<span class='treeref'>???</span>"
+        "<span class='treeref-suffix'></span>"
+    )
