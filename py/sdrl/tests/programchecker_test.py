@@ -1,8 +1,10 @@
 # pytest tests for programchecker
 import tempfile
 import textwrap
+import types
 from pathlib import Path
 
+import base as b
 import sdrl.programchecker as programchecker
 
 
@@ -43,6 +45,14 @@ def test_extracts_program_check_from_content():
     assert header is not None
     assert header.lang == "apt-get install -y python3-pip"
     assert header.deps == "pip install fastapi"
+
+
+def test_missing_altdir_without_itreedir_is_warning(tmp_path):
+    """Local author builds omit itreedir and should not accumulate an error."""
+    b._testmode_reset()
+    course = types.SimpleNamespace(altdir=str(tmp_path / "missing"), itreedir=None)
+    assert programchecker.extract_program_test_targets(course) == []
+    assert b.num_errors == 0
 
 
 def test_parses_multiline_lang_and_deps():

@@ -3,9 +3,11 @@ author role: Generate the website with incremental build.
 See the architecture sketch in docs/internal_notes.md.
 """
 import argparse
+import contextlib
 import json
 import os
 import os.path
+import tempfile
 import typing as tg
 
 import click
@@ -42,16 +44,35 @@ def author_command():
     "--config", type=str, default=c.AUTHOR_CONFIG_FILENAME,
     help="SeDriLa configuration description YAML file"
 )
+@click.option(
+    "--local", default=False, is_flag=True,
+    help="build locally without private instructor-only artifacts"
+)
+@click.option(
+    "--local-startdate", type=str, default="2000-01-01",
+    help="fallback start date for --local if the course config omits one"
+)
+@click.option(
+    "--local-enddate", type=str, default="2099-12-31",
+    help="fallback end date for --local if the course config omits one"
+)
 def build_command(
     targetdir: str, print_status: bool,
     include_stage: str, config: str,
+    local: bool, local_startdate: str, local_enddate: str,
 ):
     """Build the SeDriLa course"""
     targetdir_s = targetdir
     targetdir_i = _targetdir_i(targetdir)
     prepare_directories(targetdir_s, targetdir_i)
-    create_and_build_course2(dict(config=config, include_stage=include_stage, sums=print_status), 
-                             targetdir_i, targetdir_s)
+    config_context = (
+        local_build_configfile(config, local_startdate, local_enddate)
+        if local else contextlib.nullcontext(config)
+    )
+    with config_context as build_config:
+        create_and_build_course2(
+            dict(config=build_config, include_stage=include_stage, sums=print_status),
+            targetdir_i, targetdir_s)
     b.finalmessage()
 
 
@@ -86,6 +107,25 @@ def status_command():
 def delete_cache(targetdir_i: str):
     p = os.path.join(targetdir_i, c.CACHE_FILENAME)
     if os.path.exists(p): os.remove(p)
+
+
+@contextlib.contextmanager
+def local_build_configfile(configfile: str, startdate: str, enddate: str) -> tg.Iterator[str]:
+    """Create a temporary config suitable for local author previews."""
+    config = dict(b.slurp_yaml(configfile, os.environ))
+    config.setdefault("startdate", startdate)
+    config.setdefault("enddate", enddate)
+    for private_key in ("itreedir", "htaccess_template", "participants"):
+        config.pop(private_key, None)
+    with tempfile.NamedTemporaryFile("wt", suffix=".yaml", delete=False, encoding="utf8") as tmpfile:
+        tmp_configfile = tmpfile.name
+    try:
+        b.spit_yaml(tmp_configfile, config)
+        yield tmp_configfile
+    finally:
+        if os.path.exists(tmp_configfile):
+            os.remove(tmp_configfile)
+
 
 def create_and_build_course2(args, targetdir_i, targetdir_s) -> sdrl.coursebuilder.Coursebuilder:
     # ----- prepare build:

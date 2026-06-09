@@ -45,8 +45,8 @@ include = [
     "README.md", 
     "LICENSE", 
     "pyproject.toml",
-    "templates/*",
-    "baseresources/*",
+    { path = "templates/*", format = ["sdist", "wheel"] },
+    { path = "baseresources/*", format = ["sdist", "wheel"] },
 ]
 
 # https://python-poetry.org/docs/pyproject/#dependencies-and-dependency-groups
