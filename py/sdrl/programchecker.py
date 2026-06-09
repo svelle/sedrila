@@ -240,7 +240,8 @@ def extract_program_test_targets(course: sdrl.coursebuilder.Coursebuilder) -> Li
     targets: List[ProgramTestTarget] = []
     altdir_path = Path(course.altdir).resolve()
     if not altdir_path.exists():
-        b.error(f"altdir not found: {altdir_path}")
+        report = b.warning if not getattr(course, 'itreedir', None) else b.error
+        report(f"altdir not found: {altdir_path}")
         return targets
     extractor = ProgramCheckHeaderExtractor()
     # Walk through all .prot files in altdir
