@@ -5,6 +5,7 @@ import os
 import types
 import unittest.mock as mock
 
+import click.testing
 import pytest
 
 import base as b
@@ -196,6 +197,59 @@ chapters:
         assert "participants" not in config
         assert os.path.exists(local_config)
     assert not os.path.exists(local_config)
+
+
+def test_build_command_local_uses_temporary_config(tmp_path):
+    configfile = tmp_path / "sedrila.yaml"
+    configfile.write_text("""
+title: Test Course
+name: Test
+chapterdir: ch
+altdir: altdir/ch
+stages: [draft]
+instructors:
+  - nameish: Teacher
+    email: teacher@example.org
+    gitaccount: teacher
+    webaccount: teacher
+    keyfingerprint: "-"
+    pubkey: "-"
+allowed_attempts: "2"
+itreedir: altdir/itree.zip
+htaccess_template: "Require user teacher"
+chapters:
+  - name: Chapter
+    taskgroups:
+      - name: Group
+""")
+    captured = {}
+
+    def fake_build(args, targetdir_i, targetdir_s):
+        captured["args"] = args
+        captured["targetdir_i"] = targetdir_i
+        captured["targetdir_s"] = targetdir_s
+        captured["config"] = b.slurp_yaml(args["config"])
+
+    runner = click.testing.CliRunner()
+    with mock.patch.object(author, "prepare_directories"), \
+            mock.patch.object(author, "create_and_build_course2", side_effect=fake_build):
+        result = runner.invoke(author.author_command, [
+            "build",
+            "--local",
+            "--local-startdate", "2024-01-01",
+            "--local-enddate", "2024-12-31",
+            "--include-stage", "draft",
+            "--config", str(configfile),
+            str(tmp_path / "out"),
+        ])
+
+    assert result.exit_code == 0
+    assert captured["args"]["include_stage"] == "draft"
+    assert captured["config"]["startdate"] == "2024-01-01"
+    assert captured["config"]["enddate"] == "2024-12-31"
+    assert "itreedir" not in captured["config"]
+    assert "htaccess_template" not in captured["config"]
+    assert not os.path.exists(captured["args"]["config"])
 
 
 # ── purge_all_but ─────────────────────────────────────────────────────────────

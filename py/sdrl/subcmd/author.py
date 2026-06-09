@@ -44,50 +44,34 @@ def author_command():
     "--config", type=str, default=c.AUTHOR_CONFIG_FILENAME,
     help="SeDriLa configuration description YAML file"
 )
+@click.option(
+    "--local", default=False, is_flag=True,
+    help="build locally without private instructor-only artifacts"
+)
+@click.option(
+    "--local-startdate", type=str, default="2000-01-01",
+    help="fallback start date for --local if the course config omits one"
+)
+@click.option(
+    "--local-enddate", type=str, default="2099-12-31",
+    help="fallback end date for --local if the course config omits one"
+)
 def build_command(
     targetdir: str, print_status: bool,
     include_stage: str, config: str,
+    local: bool, local_startdate: str, local_enddate: str,
 ):
     """Build the SeDriLa course"""
     targetdir_s = targetdir
     targetdir_i = _targetdir_i(targetdir)
     prepare_directories(targetdir_s, targetdir_i)
-    create_and_build_course2(dict(config=config, include_stage=include_stage, sums=print_status), 
-                             targetdir_i, targetdir_s)
-    b.finalmessage()
-
-
-@author_command.command(name="local-build")
-@click.argument("targetdir", type=click.Path())
-@click.option("--print-status", default=False, is_flag=True, help="print task volume reports")
-@click.option(
-    "--include-stage", type=str, default="",
-    help="include parts with this and higher 'stage:'"
-)
-@click.option(
-    "--config", type=str, default=c.AUTHOR_CONFIG_FILENAME,
-    help="SeDriLa configuration description YAML file"
-)
-@click.option(
-    "--startdate", type=str, default="2000-01-01",
-    help="fallback start date if the course config omits one"
-)
-@click.option(
-    "--enddate", type=str, default="2099-12-31",
-    help="fallback end date if the course config omits one"
-)
-def local_build_command(
-    targetdir: str, print_status: bool,
-    include_stage: str, config: str,
-    startdate: str, enddate: str,
-):
-    """Build the course locally without private instructor-only artifacts."""
-    targetdir_s = targetdir
-    targetdir_i = _targetdir_i(targetdir)
-    prepare_directories(targetdir_s, targetdir_i)
-    with local_build_configfile(config, startdate, enddate) as local_config:
+    config_context = (
+        local_build_configfile(config, local_startdate, local_enddate)
+        if local else contextlib.nullcontext(config)
+    )
+    with config_context as build_config:
         create_and_build_course2(
-            dict(config=local_config, include_stage=include_stage, sums=print_status),
+            dict(config=build_config, include_stage=include_stage, sums=print_status),
             targetdir_i, targetdir_s)
     b.finalmessage()
 
